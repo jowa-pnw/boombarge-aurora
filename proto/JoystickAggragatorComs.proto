@@ -40,7 +40,7 @@ enum VisualTestType {
   VISUAL_TEST_TYPE_UNSPECIFIED = 0;
   VISUAL_TEST_BLINK = 1; // Blink the forward and aft lights quickly 
   VISUAL_TEST_RGB = 2; // Use the RGB lights to clearly indicate the front and back of the boat
-  VISUAL_TEST_RGB_WAVE = 2; // Show off the RGB lights with a wave pattern
+  VISUAL_TEST_RGB_WAVE = 3; // Show off the RGB lights with a wave pattern
 }
 
 // A request to set the visual test state
