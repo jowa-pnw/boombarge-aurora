@@ -1,0 +1,122 @@
+syntax = "proto3";
+
+package JoystickAggragatorComs;
+
+// +
+// + Messages from the joystick to the aggregator
+// +
+
+// Message from the joystick to the aggregator
+message JoystickMessage {
+  oneof message {
+    GetPing get_ping = 1;
+    GetSystemStatus get_system_status = 2;
+    SetPropulsion set_propulsion = 3;
+    SetVisualTest set_visual_test = 4;
+    SetSystemArmed set_system_armed = 5;
+    TriggerSequence trigger_sequence = 6;
+    AbortSequence abort_sequence = 7;
+  }
+}
+
+// A ping request
+message GetPing {
+  int32 iteration = 1; // The iteration number of the ping
+}
+
+// A request for the system status
+message GetSystemStatus {
+  // Empty message
+}
+
+// A request to set the propulsion system
+message SetPropulsion {
+  uint32 left = 1; // The left propulsion value (0 = full reverse, 127 = stop, 255 = full forward)
+  uint32 right = 2; // The right propulsion value (0 = full reverse, 127 = stop, 255 = full forward)
+}
+
+// The list of visual test types
+enum VisualTestType {
+  VISUAL_TEST_TYPE_UNSPECIFIED = 0;
+  VISUAL_TEST_BLINK = 1; // Blink the forward and aft lights quickly 
+  VISUAL_TEST_RGB = 2; // Use the RGB lights to clearly indicate the front and back of the boat
+  VISUAL_TEST_RGB_WAVE = 2; // Show off the RGB lights with a wave pattern
+}
+
+// A request to set the visual test state
+message SetVisualTest {
+  bool enable = 1; // Whether to enable or disable the visual test
+  VisualTestType type = 2; // The type of visual test to run
+}
+
+// A request to set the system armed state
+message SetSystemArmed {
+  bool armed = 1; // Whether to arm or disarm the system
+}
+
+// A request to trigger a sequence
+message TriggerSequence {
+  string id = 1; // The ID of the sequence to trigger
+  int32 frame = 2; // The frame number to start the sequence at
+}
+
+// A request to abort the currently running sequence
+message AbortSequence {
+  // Empty message
+}
+
+
+// +
+// + Messages from the aggregator to the joystick
+// +
+
+// Message from the aggregator to the joystick
+message JoystickReplyMessage {
+  oneof message {
+    PingReply ping_reply = 1;
+    SystemStatusReply system_status_reply = 2;
+    IgnitionEvent ignition_event = 3;
+    FaultEvent fault_event = 4;
+  }
+}
+
+// A ping reply from the aggregator to the joystick
+message PingReply {
+  int32 iteration = 1; // The iteration number of the ping
+}
+
+// A system status reply from the aggregator to the joystick
+message SystemStatusReply {
+  IgnitorSystemStatus igniors_status = 1; // The status of the ignitors
+  SequencerSystemStatus sequencer_status = 2; // The status of the sequencer
+  bool visual_test_enabled = 3; // Whether the visual test is enabled
+}
+
+// The status of the aggragator ignition system
+message IgnitorSystemStatus {
+  bool aggregator_armed = 1; // Whether the aggregator is armed or disarmed (software only)
+  bool physical_deadlock_armed = 2; // Whether the physical deadlock is armed or disarmed
+  repeated bool controllers_connected = 3; // Whether the ignitor controllers are connected and replying to pings
+  bool controllers_disagree = 4; // Whether or not one or more ignitors controllers disagree about the state of the pysical arm/disarm deadlock
+}
+
+// The status of the aggragator sequencer system
+message SequencerSystemStatus {
+  bool controller_connected = 1; // Whether or not the sequencer controller is connected and replying to pings
+  bool sequence_running = 2; // Whether a sequence is currently running
+  bool sequence_fault = 3; // Whether or not the sequence has faulted
+  int32 sequence_id = 4; // The ID of the sequence that is currently running
+  string sequence_frame = 5; // The current frame of the sequence that is currently running
+  int32 sequence_frame_count = 6; // The total number of frames in the sequence that is currently running
+}
+
+// An ignition event
+message IgnitionEvent {
+  int32 ignitor_controller_id = 1; // The ID of the ignitor controller that sent the event
+  int32 ignitor_index = 2; // The index of the ignitor that sent the event
+}
+
+// A fault event
+message FaultEvent {
+  string fault_message = 1; // The fault message
+}
