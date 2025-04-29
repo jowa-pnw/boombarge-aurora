@@ -1,7 +1,5 @@
 syntax = "proto3";
 
-package JoystickAggragatorComs;
-
 // +
 // + Messages from the joystick to the aggregator
 // +

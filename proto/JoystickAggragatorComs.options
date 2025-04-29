@@ -1,2 +1,2 @@
-IgnitorSystemStatus.controllers_connected max_size:16
+IgnitorSystemStatus.controllers_connected max_count:16
 FaultEvent.fault_message max_size:255
