@@ -6,10 +6,25 @@
 // Constants
 // =============================================================================
 
+// Menu input mappings
+const int LEFT_MENU_CYCLE_BUTTON = BUTTON_L_BUMPER;
+const int RIGHT_MENU_CYCLE_BUTTON = BUTTON_R_BUMPER;
+const int MENU_HOME_BUTTON = BUTTON_MENU_1;
+
+// Menu top bar constrains
 const int MENU_HEADER_HEIGHT = 10;
 
-typedef void (*DrawMenuFunction)(JoystickHidData_t *joystickHidData);
-const int NUM_MENU_FUNCTIONS = 7;
+// Menu navigation
+typedef void (*MenuHandler)(JoystickHidData_t *joystickHidData);
+const int MENU_COUNT = 7;
+const int HOME_MENU = 0;
+
+// Menu line positions
+const int MENU_LINE_1 = 12;
+const int MENU_LINE_2 = 21;
+const int MENU_LINE_3 = 30;
+const int MENU_LINE_4 = 39;
+
 
 // =============================================================================
 // Global Variables
@@ -25,25 +40,32 @@ bool CycleRightPressed = false;
 // Function Prototypes
 // =============================================================================
 
+// Input detection helpers
+void updateSelectedMenuFromInput(JoystickHidData_t *joystickHidData);
+
+// Drawing helpers
 void drawMenuTopBar(bool cycleLeftHeld, bool cycleRightHeld);
 void drawMenuTitle(String title);
-void drawStatusMenu(JoystickHidData_t *joystickHidData);
-void drawVisibilityTestMenu(JoystickHidData_t *joystickHidData);
-void drawSequenceMenu(JoystickHidData_t *joystickHidData);
-void drawJoystickMenu(JoystickHidData_t *joystickHidData);
-void drawIgnitorMenu(JoystickHidData_t *joystickHidData);
-void drawFaultMenu(JoystickHidData_t *joystickHidData);
-void drawArmSystemMenu(JoystickHidData_t *joystickHidData);
 
-const DrawMenuFunction MenuFunctions[NUM_MENU_FUNCTIONS] = 
+// Menu handlers (render menu and handle user interaction)
+void handleStatusMenu(JoystickHidData_t *joystickHidData);
+void handleVisibilityTestMenu(JoystickHidData_t *joystickHidData);
+void handleSequenceMenu(JoystickHidData_t *joystickHidData);
+void handleJoystickMenu(JoystickHidData_t *joystickHidData);
+void handleIgnitorMenu(JoystickHidData_t *joystickHidData);
+void handleFaultMenu(JoystickHidData_t *joystickHidData);
+void handleArmSystemMenu(JoystickHidData_t *joystickHidData);
+
+// Menu handler function pointers
+const MenuHandler MenuHandlers[MENU_COUNT] = 
 {
-    drawStatusMenu,
-    drawVisibilityTestMenu,
-    drawSequenceMenu,
-    drawJoystickMenu,
-    drawIgnitorMenu,
-    drawFaultMenu,
-    drawArmSystemMenu,
+    handleStatusMenu,
+    handleVisibilityTestMenu,
+    handleSequenceMenu,
+    handleJoystickMenu,
+    handleIgnitorMenu,
+    handleFaultMenu,
+    handleArmSystemMenu,
 };
 
 // =============================================================================
@@ -73,39 +95,51 @@ void uxInit()
 
 void uxUpdate(JoystickHidData_t *joystickHidData)
 {
-    if (joystickHidData->buttons & BUTTON_L_BUMPER)
+    // Clear the display
+    Display.clearDisplay();
+
+    // Update which menu is selected based on joystick input data
+    updateSelectedMenuFromInput(joystickHidData);
+
+    // Draw the top menu bar
+    drawMenuTopBar(CycleLeftPressed, CycleRightPressed);
+
+    // Draw the current menu and handles any user interaction with the menu
+    MenuHandlers[CurrentMenu](joystickHidData);
+
+    // Update the display 
+    Display.display();
+}
+
+void updateSelectedMenuFromInput(JoystickHidData_t *joystickHidData)
+{
+    // If the home button is pressed, reset the menu to the home menu
+    if (joystickHidData->buttons & MENU_HOME_BUTTON)
+    {
+        CurrentMenu = HOME_MENU;
+    }
+
+    // Cycle the selected menu left whenever the left menu cycle button is released
+    if (joystickHidData->buttons & LEFT_MENU_CYCLE_BUTTON)
     {
         CycleLeftPressed = true;
     }
     else if (CycleLeftPressed)
     {
         CycleLeftPressed = false;
-        CurrentMenu = (CurrentMenu - 1 + NUM_MENU_FUNCTIONS) % NUM_MENU_FUNCTIONS;
+        CurrentMenu = (CurrentMenu - 1 + MENU_COUNT) % MENU_COUNT;
     }
 
-    if (joystickHidData->buttons & BUTTON_R_BUMPER)
+    // Cycle the selected menu right whenever the right menu cycle button is released
+    if (joystickHidData->buttons & RIGHT_MENU_CYCLE_BUTTON)
     {
         CycleRightPressed = true;
     }
     else if (CycleRightPressed)
     {
         CycleRightPressed = false;
-        CurrentMenu = (CurrentMenu + 1) % NUM_MENU_FUNCTIONS;
+        CurrentMenu = (CurrentMenu + 1) % MENU_COUNT;
     }
-
-    // Clear the display
-    Display.clearDisplay();
-
-    // Draw the top menu bar
-    drawMenuTopBar(CycleLeftPressed, CycleRightPressed);
-
-    // Draw the current menu
-    if (CurrentMenu >= 0 && CurrentMenu < NUM_MENU_FUNCTIONS)
-    {
-        MenuFunctions[CurrentMenu](joystickHidData);
-    }
-
-    Display.display();
 }
 
 void drawMenuTopBar(bool cycleLeftPressed, bool cycleRightPressed)
@@ -114,6 +148,7 @@ void drawMenuTopBar(bool cycleLeftPressed, bool cycleRightPressed)
     const int leftTriangleStartX = Display.width() - 1 - triangleSize;
 
     // Draw left navigation triangle
+    // Invert the triangle region if the left menu cycle button is currently pressed
     int leftTriangleColor = BLACK;
     if (cycleLeftPressed)
     {
@@ -123,6 +158,7 @@ void drawMenuTopBar(bool cycleLeftPressed, bool cycleRightPressed)
     Display.fillTriangle(0, triangleSize / 2, triangleSize, 0, triangleSize, triangleSize, leftTriangleColor);
 
     // Draw right navigation triangle
+    // Invert the triangle region if the right menu cycle button is currently pressed
     int rightTriangleColor = BLACK;
     if (cycleRightPressed)
     {
@@ -145,49 +181,64 @@ void drawMenuTitle(String title)
     Display.write(title.c_str());
 }
 
-void drawStatusMenu(JoystickHidData_t *joystickHidData)
+void handleStatusMenu(JoystickHidData_t *joystickHidData)
 {
     drawMenuTitle("Status");
 
-    Display.setCursor(0, 12);
+    Display.setCursor(0, MENU_LINE_1);
     Display.write("Test 1");
 
-    Display.setCursor(0, 21);
+    Display.setCursor(0, MENU_LINE_2);
     Display.write("Test 2");
 
-    Display.setCursor(0, 30);
+    Display.setCursor(0, MENU_LINE_3);
     Display.write("Test 3");
 
-    Display.setCursor(0, 39);
+    Display.setCursor(0, MENU_LINE_4);
     Display.write("Test 4");
 }
 
-void drawVisibilityTestMenu(JoystickHidData_t *joystickHidData)
+void handleVisibilityTestMenu(JoystickHidData_t *joystickHidData)
 {
     drawMenuTitle("Vis. Test");
 }
 
-void drawSequenceMenu(JoystickHidData_t *joystickHidData)
+void handleSequenceMenu(JoystickHidData_t *joystickHidData)
 {
     drawMenuTitle("Sequence");
 }
 
-void drawJoystickMenu(JoystickHidData_t *joystickHidData)
+void handleJoystickMenu(JoystickHidData_t *joystickHidData)
 {
-    drawMenuTitle("Joystick");
+    // Draw the title into the top menu bar
+    drawMenuTitle("Joysticks");
+
+    // Draw the left and right joystick axis values
+    Display.setCursor(0, MENU_LINE_1);
+    Display.write("Lx: ");
+    Display.print(joystickHidData->axis[AXIS_LEFT_STICK_X]);
+    Display.setCursor(0, MENU_LINE_2);
+    Display.write("Ly: ");
+    Display.print(joystickHidData->axis[AXIS_LEFT_STICK_Y]);
+    Display.setCursor(0, MENU_LINE_3);
+    Display.write("Rx: ");
+    Display.print(joystickHidData->axis[AXIS_RIGHT_STICK_X]);
+    Display.setCursor(0, MENU_LINE_4);
+    Display.write("Ry: ");
+    Display.print(joystickHidData->axis[AXIS_RIGHT_STICK_Y]);
 }
 
-void drawIgnitorMenu(JoystickHidData_t *joystickHidData)
+void handleIgnitorMenu(JoystickHidData_t *joystickHidData)
 {
     drawMenuTitle("Ignitor");
 }
 
-void drawFaultMenu(JoystickHidData_t *joystickHidData)
+void handleFaultMenu(JoystickHidData_t *joystickHidData)
 {
     drawMenuTitle("Fault");
 }
 
-void drawArmSystemMenu(JoystickHidData_t *joystickHidData)
+void handleArmSystemMenu(JoystickHidData_t *joystickHidData)
 {
     drawMenuTitle("Arm System");
 }
