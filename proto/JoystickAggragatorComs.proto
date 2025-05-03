@@ -102,7 +102,7 @@ message IgnitorSystemStatus {
 message SequencerSystemStatus {
   bool controller_connected = 1; // Whether or not the sequencer controller is connected and replying to pings
   bool sequence_running = 2; // Whether a sequence is currently running
-  bool sequence_fault = 3; // Whether or not the sequence has faulted
+  bool sequence_abort = 3; // Whether or not the sequence has been aborted
   int32 sequence_id = 4; // The ID of the sequence that is currently running
   string sequence_frame = 5; // The current frame of the sequence that is currently running
   int32 sequence_frame_count = 6; // The total number of frames in the sequence that is currently running
