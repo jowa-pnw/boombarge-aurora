@@ -10,10 +10,11 @@ const uint32_t BUTTON_4         = 0b1000;
 const uint32_t BUTTON_L_BUMPER  = 0b10000;
 const uint32_t BUTTON_R_BUMPER  = 0b100000;
 const uint32_t BUTTON_L_TRIGGER = 0b1000000;
-const uint32_t BUTTON_MENU_1    = 0b10000000;
-const uint32_t BUTTON_MENU_2    = 0b100000000;
-const uint32_t BUTTON_L_THUMB   = 0b1000000000;
-const uint32_t BUTTON_R_THUMB   = 0b10000000000;
+const uint32_t BUTTON_R_TRIGGER = 0b10000000;
+const uint32_t BUTTON_MENU_1    = 0b100000000;
+const uint32_t BUTTON_MENU_2    = 0b1000000000;
+const uint32_t BUTTON_L_THUMB   = 0b10000000000;
+const uint32_t BUTTON_R_THUMB   = 0b100000000000;
 
 const int AXIS_LEFT_STICK_X = 0;
 const int AXIS_LEFT_STICK_Y = 1;
