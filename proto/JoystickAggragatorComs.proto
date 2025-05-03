@@ -19,7 +19,7 @@ message JoystickMessage {
 
 // A ping request
 message GetPing {
-  int32 iteration = 1; // The iteration number of the ping
+  uint32 iteration = 1; // The iteration number of the ping
 }
 
 // A request for the system status
@@ -93,9 +93,9 @@ message SystemStatusReply {
 // The status of the aggragator ignition system
 message IgnitorSystemStatus {
   bool aggregator_armed = 1; // Whether the aggregator is armed or disarmed (software only)
-  bool physical_deadlock_armed = 2; // Whether the physical deadlock is armed or disarmed
+  bool aggregator_physically_armed = 2; // Whether or not the aggregator is physically armed or disarmed (hardware only)
   repeated bool controllers_connected = 3; // Whether the ignitor controllers are connected and replying to pings
-  bool controllers_disagree = 4; // Whether or not one or more ignitors controllers disagree about the state of the pysical arm/disarm deadlock
+  repeated bool controllers_physically_armed = 4; // Whether or not ignitor controllers are physically armed or disarmed
 }
 
 // The status of the aggragator sequencer system
@@ -103,9 +103,10 @@ message SequencerSystemStatus {
   bool controller_connected = 1; // Whether or not the sequencer controller is connected and replying to pings
   bool sequence_running = 2; // Whether a sequence is currently running
   bool sequence_abort = 3; // Whether or not the sequence has been aborted
-  int32 sequence_id = 4; // The ID of the sequence that is currently running
-  string sequence_frame = 5; // The current frame of the sequence that is currently running
-  int32 sequence_frame_count = 6; // The total number of frames in the sequence that is currently running
+  uint32 sequence_count = 4; // The number of sequences that can be played back by the sequencer
+  uint32 sequence_id = 5; // The ID of the sequence that is currently running
+  uint32 sequence_frame = 6; // The current frame of the sequence that is currently running
+  uint32 sequence_frame_count = 7; // The total number of frames in the sequence that is currently running
 }
 
 // An ignition event
