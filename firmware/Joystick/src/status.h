@@ -60,7 +60,7 @@ struct SystemStatus_t
     bool isConnected;
 
     // Set to true only if there was previously a connection to the aggregator and the connection was lost
-    bool connectionLost; 
+    bool isConnectionLost; 
 
     // The last time a parsable reply was received from the aggregator
     uint32_t lastMessageReceivedMillis; 
@@ -77,12 +77,25 @@ struct SystemStatus_t
     uint32_t lastPingSentMillis;
 
     // The last time a ping was received from the aggregator
-    uint32_t lastPingReceivedMillis;
+    uint32_t lastPingRoundtripMillis;
 
 
     //
     // Ignitor status
     //
+
+    // Whether or not all arm/disarm flags are set to armed
+    // This also means that all ignitor controllers are connected and responding to pings
+    bool isFullyArmed;
+
+    // Whether or not all ignitor controllers are connected and responding to pings
+    bool areAllIgnitorsControllersConnected;
+
+    // Whether or not any ignitor controllers have lost connection to the aggregator
+    bool areAnyIgnitorsControllersLost;
+
+    // Whether or not all ignitors are physically armed
+    bool areAllIgnitorsPhysicallyArmed;
 
     // Whether or not the aggregator is "software" armed
     bool isSoftwareArmed;
@@ -105,10 +118,10 @@ struct SystemStatus_t
     //
 
     // Whether or not the sequencer is connected and responding to pings
-    bool sequencerConnected;
+    bool isSequencerConnected;
 
     // Whether or not the sequencer has lost connection to the aggregator
-    bool sequencerLostConnection;
+    bool isSequencerConnectionLost;
 
     // Whether or not a sequence is currently running
     bool isSequenceRunning;
