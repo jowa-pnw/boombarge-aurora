@@ -174,6 +174,9 @@ struct SystemStatus_t
 
     // The last fault message received from the aggregator
     char faultMessage[255];
+
+    // The length of the last fault message received from the aggregator
+    int faultMessageLength = -1;
 };
 
 

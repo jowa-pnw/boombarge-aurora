@@ -411,11 +411,22 @@ void handleStatusMenu(SystemStatus_t *systemStatus, JoystickHidData_t *joystickH
 void handleVisibilityTestMenu(SystemStatus_t *systemStatus, JoystickHidData_t *joystickHidData)
 {
     drawMenuTitle("Vis. Test");
+
+    drawCenteredText("Not\nImplemented", CENTER_VERTICALLY);
 }
 
 void handleSequenceMenu(SystemStatus_t *systemStatus, JoystickHidData_t *joystickHidData)
 {
     drawMenuTitle("Sequence");
+
+    // If the system is not connected to the aggragator, draw the connection timer
+    if (!systemStatus->isConnected)
+    {
+        drawConnectionTimer(systemStatus);
+        return;
+    }
+
+    drawCenteredText("Not\nImplemented", CENTER_VERTICALLY);
 }
 
 void handleJoystickMenu(SystemStatus_t *systemStatus, JoystickHidData_t *joystickHidData)
@@ -440,15 +451,44 @@ void handleJoystickMenu(SystemStatus_t *systemStatus, JoystickHidData_t *joystic
 
 void handleIgnitorMenu(SystemStatus_t *systemStatus, JoystickHidData_t *joystickHidData)
 {
-    drawMenuTitle("Ignitor");
+    drawMenuTitle("Ignition");
+
+    // If the system is not connected to the aggragator, draw the connection timer
+    if (!systemStatus->isConnected)
+    {
+        drawConnectionTimer(systemStatus);
+        return;
+    }
+
+    drawCenteredText("Not\nImplemented", CENTER_VERTICALLY);
 }
 
 void handleFaultMenu(SystemStatus_t *systemStatus, JoystickHidData_t *joystickHidData)
 {
     drawMenuTitle("Fault");
+
+    // If there are no faults, draw the "No Faults" message
+    if (systemStatus->faultMessageLength == -1)
+    {
+        drawCenteredText("No Faults", CENTER_VERTICALLY);
+        return;
+    }
+
+    // If there is a fault, draw the fault message to the display
+    Display.setCursor(0, MENU_LINE_1);
+    Display.write(systemStatus->faultMessage);
 }
 
 void handleArmSystemMenu(SystemStatus_t *systemStatus, JoystickHidData_t *joystickHidData)
 {
     drawMenuTitle("Arm System");
+
+    // If the system is not connected to the aggragator, draw the connection timer
+    if (!systemStatus->isConnected)
+    {
+        drawConnectionTimer(systemStatus);
+        return;
+    }
+
+    drawCenteredText("Not\nImplemented", CENTER_VERTICALLY);
 }
