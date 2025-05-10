@@ -38,7 +38,7 @@ struct SystemStatus_t
     bool propulsionUpdateRequested;
 
     // Whether or not a visual test has been requested by the UX
-    bool requestVisualTestToggle;
+    bool visualTestUpdateRequested;
 
 
     //

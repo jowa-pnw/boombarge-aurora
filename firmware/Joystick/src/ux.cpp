@@ -12,6 +12,9 @@ const int UX_REFRESH_RATE = 40;
 const int LEFT_MENU_CYCLE_BUTTON = BUTTON_L_BUMPER;
 const int RIGHT_MENU_CYCLE_BUTTON = BUTTON_R_BUMPER;
 const int MENU_HOME_BUTTON = BUTTON_MENU_1;
+const int VISUAL_TEST_BUTTON = BUTTON_MENU_2;
+const int VISUAL_TEST_UP_BUTTON = DPAD_UP;
+const int VISUAL_TEST_DOWN_BUTTON = DPAD_DOWN;
 
 // Menu top bar constrains
 const int MENU_HEADER_HEIGHT = 10;
@@ -30,6 +33,11 @@ const int MENU_LINE_4 = MENU_LINE_3 + MENU_LINE_HEIGHT;
 const int CENTER_VERTICALLY = -1;
 const int CENTER_VERTICALLY_FULL_SCREEN = -2;
 
+// Visual test values
+const int VISUAL_TEST_TOGGLE_HOLD_TIME = 2500; // Time to hold the visual test button before treating it as a toggle instead of a momentary push
+const int VISUAL_TEST_TYPE_MIN = 0;
+const int VISUAL_TEST_TYPE_MAX = 3;
+
 
 // =============================================================================
 // Global Variables
@@ -38,8 +46,14 @@ const int CENTER_VERTICALLY_FULL_SCREEN = -2;
 uint32_t lastUxUpdateMillis = 0;
 Adafruit_PCD8544 Display = Adafruit_PCD8544(5, 4, 3);
 int CurrentMenu = 0;
+
 bool CycleLeftPressed = false;
 bool CycleRightPressed = false;
+
+uint32_t VisualTestPressedMillis = 0;
+bool VisualTestPressed = false;
+bool VisualTestUpPressed = false;
+bool VisualTestDownPressed = false;
 
 
 // =============================================================================
@@ -48,12 +62,14 @@ bool CycleRightPressed = false;
 
 // Input detection helpers
 void updateSelectedMenuFromInput(JoystickHidData_t *joystickHidData);
+void updateVisualTestStatusRequestFromInput(SystemStatus_t *systemStatus, JoystickHidData_t *joystickHidData);
 
 // Drawing helpers
 void drawMenuTopBar(bool cycleLeftHeld, bool cycleRightHeld);
 void drawMenuTitle(String title);
 void drawConnectionTimer(SystemStatus_t *systemStatus);
 void drawCenteredText(String text, int y);
+void drawSelectionTriangle(int x, int y, bool selected);
 
 // String helpers
 String getTimeString(uint32_t timeInMillis);
@@ -126,8 +142,9 @@ void uxUpdate(SystemStatus_t *systemStatus, JoystickHidData_t *joystickHidData)
     // Clear the display
     Display.clearDisplay();
 
-    // Update which menu is selected based on joystick input data
+    // Perform updates to the UX state based on joystick input
     updateSelectedMenuFromInput(joystickHidData);
+    updateVisualTestStatusRequestFromInput(systemStatus, joystickHidData);
 
     // Draw the top menu bar
     drawMenuTopBar(CycleLeftPressed, CycleRightPressed);
@@ -170,6 +187,47 @@ void updateSelectedMenuFromInput(JoystickHidData_t *joystickHidData)
     {
         CycleRightPressed = false;
         CurrentMenu = (CurrentMenu + 1) % MENU_COUNT;
+    }
+}
+
+void updateVisualTestStatusRequestFromInput(SystemStatus_t *systemStatus, JoystickHidData_t *joystickHidData)
+{
+    //
+    // Visual test button behavior:
+    // When the button is pressed, visual test is enabled
+    // When the button is held for VISUAL_TEST_TOGGLE_HOLD_TIME, visual test status is not changed (behavior is toggle)
+    // When the button is released before VISUAL_TEST_TOGGLE_HOLD_TIME, visual test is disabled (behavior is momentary)
+    //
+
+    // When the visual test button is first pressed, update the button status and enable the visual test test
+    if (joystickHidData->buttons & VISUAL_TEST_BUTTON && !VisualTestPressed)
+    {
+        // Update button state
+        VisualTestPressed = true;
+        VisualTestPressedMillis = millis();
+
+        // If visual test is not already enabled, enable it and request an update
+        if (!systemStatus->isVisualTestEnabled)
+        {
+            systemStatus->isVisualTestEnabled = true;
+            systemStatus->visualTestUpdateRequested = true;
+        }
+    }
+
+    // When the visual test button is released, update the button state and 
+    // disable the visual test if the input was a momentary push instead of a toggle
+    else if (VisualTestPressed && !(joystickHidData->buttons & VISUAL_TEST_BUTTON))
+    {
+        // Update button state
+        VisualTestPressed = false;
+
+        // If the button is released before the toggle hold time, disable the visual test
+        if (millis() - VisualTestPressedMillis < VISUAL_TEST_TOGGLE_HOLD_TIME)
+        {
+            systemStatus->isVisualTestEnabled = false;
+            systemStatus->visualTestUpdateRequested = true;
+        }
+        
     }
 }
 
@@ -275,6 +333,20 @@ void drawCenteredText(String text, int y)
 
         // Update the start index for the next line
         lineStartIndex = lineEndIndex + 1;
+    }
+}
+
+void drawSelectionTriangle(int x, int y, bool selected)
+{
+    // Draw a triangle at the specified position
+    const int triangleSize = 7;
+    if (selected)
+    {
+        Display.fillTriangle(x, y, x, y + triangleSize, x + triangleSize, y + (triangleSize / 2), BLACK);
+    }
+    else
+    {
+        Display.drawTriangle(x, y, x, y + triangleSize, x + triangleSize, y + (triangleSize / 2), BLACK);
     }
 }
 
@@ -410,9 +482,60 @@ void handleStatusMenu(SystemStatus_t *systemStatus, JoystickHidData_t *joystickH
 
 void handleVisibilityTestMenu(SystemStatus_t *systemStatus, JoystickHidData_t *joystickHidData)
 {
+    // Draw the title of the visual test menu
     drawMenuTitle("Vis. Test");
 
-    drawCenteredText("Not\nImplemented", CENTER_VERTICALLY);
+    // Update the visual test type based on joystick input
+    if (joystickHidData->axis[AXIS_DPAD] == VISUAL_TEST_UP_BUTTON)
+    {
+        VisualTestUpPressed = true;
+    }
+    else if (VisualTestUpPressed)
+    {
+        VisualTestUpPressed = false;
+        systemStatus->visualTestType = (systemStatus->visualTestType - 1 + (VISUAL_TEST_TYPE_MAX + 1)) % (VISUAL_TEST_TYPE_MAX + 1);
+
+        // If the visual test is currrently enabled, refresh the request to the new visual test type
+        if (systemStatus->isVisualTestEnabled)
+        {
+            systemStatus->visualTestUpdateRequested = true;
+        }
+    }
+    if (joystickHidData->axis[AXIS_DPAD] == VISUAL_TEST_DOWN_BUTTON)
+    {
+        VisualTestDownPressed = true;
+    }
+    else if (VisualTestDownPressed)
+    {
+        VisualTestDownPressed = false;
+        systemStatus->visualTestType = (systemStatus->visualTestType + 1) % (VISUAL_TEST_TYPE_MAX + 1);
+
+        // If the visual test is currrently enabled, refresh the request to the new visual test type
+        if (systemStatus->isVisualTestEnabled)
+        {
+            systemStatus->visualTestUpdateRequested = true;
+        }
+    }
+
+    // Draw the visual test type selection menu
+    // TODO: Consider moving effect names to an array in a header somewhere and drawing menu with a for loop
+    {
+        drawSelectionTriangle(0, MENU_LINE_1, systemStatus->visualTestType == 0);
+        Display.setCursor(12, MENU_LINE_1);
+        Display.write("Std. Blink");
+
+        drawSelectionTriangle(0, MENU_LINE_2, systemStatus->visualTestType == 1);
+        Display.setCursor(12, MENU_LINE_2);
+        Display.write("LED F/B");
+
+        drawSelectionTriangle(0, MENU_LINE_3, systemStatus->visualTestType == 2);
+        Display.setCursor(12, MENU_LINE_3);
+        Display.write("RGB Wave");
+
+        drawSelectionTriangle(0, MENU_LINE_4, systemStatus->visualTestType == 3);
+        Display.setCursor(12, MENU_LINE_4);
+        Display.write("LED White");
+    }
 }
 
 void handleSequenceMenu(SystemStatus_t *systemStatus, JoystickHidData_t *joystickHidData)
