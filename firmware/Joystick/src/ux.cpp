@@ -18,6 +18,8 @@ const int VISUAL_TEST_DOWN_BUTTON = DPAD_DOWN;
 const int PROPULSION_LEFT_AXIS = AXIS_LEFT_STICK_Y;
 const int PROPULSION_RIGHT_AXIS = AXIS_RIGHT_STICK_Y;
 const int DISARM_BUTTON = BUTTON_1;
+const int TRIGGER_SEQ_BUTTON_1 = BUTTON_L_TRIGGER;
+const int TRIGGER_SEQ_BUTTON_2 = BUTTON_R_TRIGGER;
 
 // Propulsion system input mappings
 const int PROPULSION_CENTER = 128; // Center value for the propulsion system
@@ -40,6 +42,9 @@ const int MENU_LINE_4 = MENU_LINE_3 + MENU_LINE_HEIGHT;
 const int CENTER_VERTICALLY = -1;
 const int CENTER_VERTICALLY_FULL_SCREEN = -2;
 
+// Trigger sequence values
+const int TRIGGER_SEQ_HOLDTIME = 2000; // The amount of time the trigger sequence buttons must be held to trigger the sequence
+
 // Visual test values
 const int VISUAL_TEST_TOGGLE_HOLD_TIME = 2500; // Time to hold the visual test button before treating it as a toggle instead of a momentary push
 const int VISUAL_TEST_TYPE_MIN = 0;
@@ -56,6 +61,8 @@ const int ARM_DIGITS_TIMEOUT = 1500; // The amount of time between arm digit pre
 uint32_t lastUxUpdateMillis = 0;
 Adafruit_PCD8544 Display = Adafruit_PCD8544(5, 4, 3);
 int CurrentMenu = 0;
+
+uint32_t triggerSequenceButtonsPressedTime = 0;
 
 bool CycleLeftPressed = false;
 bool CycleRightPressed = false;
@@ -78,6 +85,7 @@ bool NextArmDigitPressed = false;
 
 // Input detection helpers
 void updatePropulsionFromInput(SystemStatus_t *systemStatus, JoystickHidData_t *joystickHidData);
+void updateSequenceTriggerFromInput(SystemStatus_t *systemStatus, JoystickHidData_t *joystickHidData);
 void updateSelectedMenuFromInput(JoystickHidData_t *joystickHidData);
 void updateVisualTestStatusRequestFromInput(SystemStatus_t *systemStatus, JoystickHidData_t *joystickHidData);
 
@@ -160,6 +168,8 @@ void uxUpdate(SystemStatus_t *systemStatus, JoystickHidData_t *joystickHidData)
     Display.clearDisplay();
 
     // Perform updates to the UX state based on joystick input
+    updatePropulsionFromInput(systemStatus, joystickHidData);
+    updateSequenceTriggerFromInput(systemStatus, joystickHidData);
     updateSelectedMenuFromInput(joystickHidData);
     updateVisualTestStatusRequestFromInput(systemStatus, joystickHidData);
 
@@ -195,6 +205,35 @@ void updatePropulsionFromInput(SystemStatus_t *systemStatus, JoystickHidData_t *
 
         // Request an update to the propulsion system
         systemStatus->propulsionUpdateRequested = true;
+    }
+}
+
+void updateSequenceTriggerFromInput(SystemStatus_t *systemStatus, JoystickHidData_t *joystickHidData)
+{
+    // If the system is not connected, return (we don't want to trigger a sequence immediately after connecting)
+    if (!systemStatus->isConnected)
+    {
+        return;
+    }
+
+    // If both of the sequence trigger buttons are pressed for TRIGGER_SEQ_HOLDTIME, trigger the sequence
+    if (joystickHidData->buttons & (TRIGGER_SEQ_BUTTON_1 | TRIGGER_SEQ_BUTTON_2))
+    {
+        if (triggerSequenceButtonsPressedTime == 0)
+        {
+            triggerSequenceButtonsPressedTime = millis();
+        }
+        else if (millis() - triggerSequenceButtonsPressedTime >= TRIGGER_SEQ_HOLDTIME)
+        {
+            systemStatus->sequenceTriggerRequested = true;
+            triggerSequenceButtonsPressedTime = 0;
+        }
+    }
+
+    // Reset the trigger sequence button pressed time if either button is released
+    else
+    {
+        triggerSequenceButtonsPressedTime = 0;
     }
 }
 
