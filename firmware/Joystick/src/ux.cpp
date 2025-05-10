@@ -7,7 +7,7 @@
 // =============================================================================
 
 const int UX_REFRESH_RATE = 40;
-const int UX_NOTIFICATION_TIMEOUT = 2500; // The amount of time to display a notification before clearing it
+const int UX_NOTIFICATION_TIMEOUT = 2000; // The amount of time to display a notification before clearing it
 
 // Menu input mappings
 const int LEFT_MENU_CYCLE_BUTTON = BUTTON_L_BUMPER;
@@ -44,7 +44,7 @@ const int CENTER_VERTICALLY = -1;
 const int CENTER_VERTICALLY_FULL_SCREEN = -2;
 
 // Trigger sequence values
-const int TRIGGER_SEQ_HOLDTIME = 2000; // The amount of time the trigger sequence buttons must be held to trigger the sequence
+const int TRIGGER_SEQ_HOLDTIME = 3000; // The amount of time the trigger sequence buttons must be held to trigger the sequence
 
 // Visual test values
 const int VISUAL_TEST_TOGGLE_HOLD_TIME = 2500; // Time to hold the visual test button before treating it as a toggle instead of a momentary push
@@ -63,7 +63,10 @@ uint32_t lastUxUpdateMillis = 0;
 Adafruit_PCD8544 Display = Adafruit_PCD8544(5, 4, 3);
 int CurrentMenu = 0;
 
-uint32_t triggerSequenceButtonsPressedTime = 0;
+uint32_t triggerSequenceButtonsPressedStart = INT32_MAX;
+bool triggerSequenceButtonsPressed = false;
+bool triggerSequenceButtonsPressedToAbort = false;
+bool triggerSequenceButtonsTimeout = false;
 
 bool CycleLeftPressed = false;
 bool CycleRightPressed = false;
@@ -222,30 +225,57 @@ void updatePropulsionFromInput(SystemStatus_t *systemStatus, JoystickHidData_t *
 
 void updateSequenceTriggerFromInput(SystemStatus_t *systemStatus, JoystickHidData_t *joystickHidData)
 {
-    // If the system is not connected, return (we don't want to trigger a sequence immediately after connecting)
-    if (!systemStatus->isConnected)
+    bool triggerButtonsCurrentlyPressed = (joystickHidData->buttons & TRIGGER_SEQ_BUTTON_1) && (joystickHidData->buttons & TRIGGER_SEQ_BUTTON_2);
+
+    // If both of the sequence trigger buttons are pressed and a sequence is currently running,
+    // request the sequence to abort. 
+    if (triggerButtonsCurrentlyPressed && systemStatus->isSequenceRunning && !triggerSequenceButtonsPressed)
+    {
+        systemStatus->sequenceAbortRequested = true;
+
+        triggerSequenceButtonsPressed = true;
+        triggerSequenceButtonsPressedToAbort = true;
+    }
+
+    // If the system is not connected to the aggregator, don't allow the trigger buttons to trigger a sequence
+    else if (!systemStatus->isConnected)
     {
         return;
     }
 
-    // If both of the sequence trigger buttons are pressed for TRIGGER_SEQ_HOLDTIME, trigger the sequence
-    if (joystickHidData->buttons & (TRIGGER_SEQ_BUTTON_1 | TRIGGER_SEQ_BUTTON_2))
+    // If both of the sequence trigger buttons are pressed and a sequence is not currently running,
+    // start a timer so that when the trigger buttons are held for a certain amount of time,
+    // the selected sequence will be triggered.
+    else if (triggerButtonsCurrentlyPressed && !triggerSequenceButtonsPressed)
     {
-        if (triggerSequenceButtonsPressedTime == 0)
-        {
-            triggerSequenceButtonsPressedTime = millis();
-        }
-        else if (millis() - triggerSequenceButtonsPressedTime >= TRIGGER_SEQ_HOLDTIME)
-        {
-            systemStatus->sequenceTriggerRequested = true;
-            triggerSequenceButtonsPressedTime = 0;
-        }
+        triggerSequenceButtonsPressedStart = millis();
+        systemStatus->notificationType = UX_NOTIFICATION_HOLD_TO_TRIGGER;
+
+        triggerSequenceButtonsPressed = true;
+        triggerSequenceButtonsPressedToAbort = false;
+        triggerSequenceButtonsTimeout = false;
     }
 
-    // Reset the trigger sequence button pressed time if either button is released
-    else
+    // If the trigger buttons are pressed for a certain amount of time, trigger the sequence
+    // NOTE: This won't happen if the triggers were initially pressed to abort the sequence
+    else if (!triggerSequenceButtonsPressedToAbort && triggerSequenceButtonsPressed && !triggerSequenceButtonsTimeout
+        && millis() - triggerSequenceButtonsPressedStart >= TRIGGER_SEQ_HOLDTIME)
     {
-        triggerSequenceButtonsPressedTime = 0;
+        systemStatus->sequenceTriggerRequested = true;
+        systemStatus->notificationType = UX_NOTIFICATION_TRIGGERING;
+        systemStatus->notificationStartMillis = millis();
+        triggerSequenceButtonsTimeout = true;
+    }
+
+    // If the trigger buttons have been released, reset the triggering sequence
+    else if (!triggerButtonsCurrentlyPressed && triggerSequenceButtonsPressed)
+    {
+        if (systemStatus->notificationType == UX_NOTIFICATION_HOLD_TO_TRIGGER)
+        {
+            systemStatus->notificationType = UX_NOTIFICATION_NONE;
+        }
+
+        triggerSequenceButtonsPressed = false;
     }
 }
 
@@ -342,6 +372,12 @@ void drawNotification(SystemStatus_t *systemStatus)
         case UX_NOTIFICATION_DISARMED:
             notificationText = "Disarmed";
             break;
+        case UX_NOTIFICATION_HOLD_TO_TRIGGER:
+            notificationText = "Hold to\nTrigger!";
+            break;
+        case UX_NOTIFICATION_TRIGGERING:
+            notificationText = "Triggering\nSequence!";
+            break;
         case UX_NOTIFICATION_SEQUENCE_TRIGGERED:
             notificationText = "Sequence\nTriggered!";
             break;
@@ -357,8 +393,9 @@ void drawNotification(SystemStatus_t *systemStatus)
     }
     drawCenteredText(notificationText, CENTER_VERTICALLY_FULL_SCREEN);
 
-    // Clear the notification after the timeout
-    if (millis() - systemStatus->notificationStartMillis >= UX_NOTIFICATION_TIMEOUT)
+    // If the current notification isn't a "hold to trigger" notification,  clear the notification after the timeout
+    if (systemStatus->notificationType != UX_NOTIFICATION_HOLD_TO_TRIGGER 
+        && millis() - systemStatus->notificationStartMillis >= UX_NOTIFICATION_TIMEOUT)
     {
         systemStatus->notificationType = UX_NOTIFICATION_NONE;
     }
