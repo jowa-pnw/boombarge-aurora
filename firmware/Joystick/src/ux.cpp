@@ -7,6 +7,7 @@
 // =============================================================================
 
 const int UX_REFRESH_RATE = 40;
+const int UX_NOTIFICATION_TIMEOUT = 2500; // The amount of time to display a notification before clearing it
 
 // Menu input mappings
 const int LEFT_MENU_CYCLE_BUTTON = BUTTON_L_BUMPER;
@@ -90,6 +91,7 @@ void updateSelectedMenuFromInput(JoystickHidData_t *joystickHidData);
 void updateVisualTestStatusRequestFromInput(SystemStatus_t *systemStatus, JoystickHidData_t *joystickHidData);
 
 // Drawing helpers
+void drawNotification(SystemStatus_t *systemStatus);
 void drawMenuTopBar(bool cycleLeftHeld, bool cycleRightHeld);
 void drawMenuTitle(String title);
 void drawConnectionTimer(SystemStatus_t *systemStatus);
@@ -173,11 +175,21 @@ void uxUpdate(SystemStatus_t *systemStatus, JoystickHidData_t *joystickHidData)
     updateSelectedMenuFromInput(joystickHidData);
     updateVisualTestStatusRequestFromInput(systemStatus, joystickHidData);
 
-    // Draw the top menu bar
-    drawMenuTopBar(CycleLeftPressed, CycleRightPressed);
+    // If there is a notification to display, draw it
+    if (systemStatus->notificationType != UX_NOTIFICATION_NONE)
+    {
+        drawNotification(systemStatus);
+    }
 
-    // Draw the current menu and handles any user interaction with the menu
-    MenuHandlers[CurrentMenu](systemStatus, joystickHidData);
+    // Otherwise, draw the current menu
+    else
+    {
+        // Draw the top menu bar
+        drawMenuTopBar(CycleLeftPressed, CycleRightPressed);
+
+        // Draw the current menu and handle any user interaction with the menu
+        MenuHandlers[CurrentMenu](systemStatus, joystickHidData);
+    }
 
     // Update the display 
     Display.display();
@@ -306,6 +318,49 @@ void updateVisualTestStatusRequestFromInput(SystemStatus_t *systemStatus, Joysti
             systemStatus->visualTestUpdateRequested = true;
         }
         
+    }
+}
+
+void drawNotification(SystemStatus_t *systemStatus)
+{
+    // Draw a rounded rectangle around the screen to indicate a notification
+    Display.drawRoundRect(0, 0, Display.width(), Display.height(), 5, BLACK);
+
+    // Draw the notification message in the center of the screen
+    String notificationText = "";
+    switch (systemStatus->notificationType)
+    {
+        case UX_NOTIFICATION_CONNECTED:
+            notificationText = "Connected!";
+            break;
+        case UX_NOTIFICATION_CONNECTION_LOST:
+            notificationText = "Connection Lost!";
+            break;
+        case UX_NOTIFICATION_ARMED:
+            notificationText = "Armed";
+            break;
+        case UX_NOTIFICATION_DISARMED:
+            notificationText = "Disarmed";
+            break;
+        case UX_NOTIFICATION_SEQUENCE_TRIGGERED:
+            notificationText = "Sequence\nTriggered!";
+            break;
+        case UX_NOTIFICATION_SEQUENCE_ABORTED:
+            notificationText = "Sequence\nAborted!";
+            break;
+        case UX_NOTIFICATION_FAULT:
+            notificationText = "Fault!";
+            break;
+        default:
+            notificationText = "ID10T Error!";
+            break;
+    }
+    drawCenteredText(notificationText, CENTER_VERTICALLY_FULL_SCREEN);
+
+    // Clear the notification after the timeout
+    if (millis() - systemStatus->notificationStartMillis >= UX_NOTIFICATION_TIMEOUT)
+    {
+        systemStatus->notificationType = UX_NOTIFICATION_NONE;
     }
 }
 
