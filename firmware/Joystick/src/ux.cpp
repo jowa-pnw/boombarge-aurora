@@ -15,6 +15,12 @@ const int MENU_HOME_BUTTON = BUTTON_MENU_1;
 const int VISUAL_TEST_BUTTON = BUTTON_MENU_2;
 const int VISUAL_TEST_UP_BUTTON = DPAD_UP;
 const int VISUAL_TEST_DOWN_BUTTON = DPAD_DOWN;
+const int PROPULSION_LEFT_AXIS = AXIS_LEFT_STICK_Y;
+const int PROPULSION_RIGHT_AXIS = AXIS_RIGHT_STICK_Y;
+
+// Propulsion system input mappings
+const int PROPULSION_CENTER = 128; // Center value for the propulsion system
+const int PROPULSION_DEADZONE = 5; // Deadzone for the propulsion system
 
 // Menu top bar constrains
 const int MENU_HEADER_HEIGHT = 10;
@@ -61,6 +67,7 @@ bool VisualTestDownPressed = false;
 // =============================================================================
 
 // Input detection helpers
+void updatePropulsionFromInput(SystemStatus_t *systemStatus, JoystickHidData_t *joystickHidData);
 void updateSelectedMenuFromInput(JoystickHidData_t *joystickHidData);
 void updateVisualTestStatusRequestFromInput(SystemStatus_t *systemStatus, JoystickHidData_t *joystickHidData);
 
@@ -157,6 +164,28 @@ void uxUpdate(SystemStatus_t *systemStatus, JoystickHidData_t *joystickHidData)
 
     // Update the last UX update time
     lastUxUpdateMillis = millis();
+}
+
+void updatePropulsionFromInput(SystemStatus_t *systemStatus, JoystickHidData_t *joystickHidData)
+{
+    // Read the left and right propulsion values from the joystick axis
+    // If either joystick is in the deadzone, set the propulsion value to the center value
+    int leftPropulsion = joystickHidData->axis[PROPULSION_LEFT_AXIS];
+    leftPropulsion = leftPropulsion < PROPULSION_CENTER - PROPULSION_DEADZONE || leftPropulsion > PROPULSION_CENTER + PROPULSION_DEADZONE
+        ? leftPropulsion : PROPULSION_CENTER;
+    int rightPropulsion = joystickHidData->axis[PROPULSION_RIGHT_AXIS];
+    rightPropulsion = rightPropulsion < PROPULSION_CENTER - PROPULSION_DEADZONE || rightPropulsion > PROPULSION_CENTER + PROPULSION_DEADZONE
+        ? rightPropulsion : PROPULSION_CENTER;
+
+    // Update the propulsion values in the system status
+    if (systemStatus->propulsionLeft != leftPropulsion || systemStatus->propulsionRight != rightPropulsion)
+    {
+        systemStatus->propulsionLeft = leftPropulsion;
+        systemStatus->propulsionRight = rightPropulsion;
+
+        // Request an update to the propulsion system
+        systemStatus->propulsionUpdateRequested = true;
+    }
 }
 
 void updateSelectedMenuFromInput(JoystickHidData_t *joystickHidData)
