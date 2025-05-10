@@ -26,7 +26,7 @@ struct SystemStatus_t
     // 
 
     // Wether or not arming the system has been requested by the UX
-    bool softwareArmRequested;
+    bool softwareArmUpdateRequested;
 
     // Whether or not triggering the selected sequence has been requested by the UX
     bool sequenceTriggerRequested;
@@ -60,7 +60,7 @@ struct SystemStatus_t
     bool isConnected;
 
     // Set to true only if there was previously a connection to the aggregator and the connection was lost
-    bool isConnectionLost; 
+    bool isConnectionLost;
 
     // The last time a parsable reply was received from the aggregator
     uint32_t lastMessageReceivedMillis; 
@@ -77,7 +77,7 @@ struct SystemStatus_t
     uint32_t lastPingSentMillis;
 
     // The last time a ping was received from the aggregator
-    uint32_t lastPingRoundtripMillis;
+    uint32_t lastPingRoundtripMillis = 9999;
 
 
     //
@@ -102,6 +102,9 @@ struct SystemStatus_t
 
     // Whether or not the aggregator detects that the physical arm/disarm switch is in the armed position
     bool isPhysicallyArmed;
+
+    // The ARM state requested by the UX
+    bool requestedArmState = false;
 
     // Whether or not the ignitor controllers are connected and responding to pings
     bool ignitorControllersConnected[IGNIOR_CONTROLLER_COUNT];

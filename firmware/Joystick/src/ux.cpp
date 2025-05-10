@@ -17,6 +17,7 @@ const int VISUAL_TEST_UP_BUTTON = DPAD_UP;
 const int VISUAL_TEST_DOWN_BUTTON = DPAD_DOWN;
 const int PROPULSION_LEFT_AXIS = AXIS_LEFT_STICK_Y;
 const int PROPULSION_RIGHT_AXIS = AXIS_RIGHT_STICK_Y;
+const int DISARM_BUTTON = BUTTON_1;
 
 // Propulsion system input mappings
 const int PROPULSION_CENTER = 128; // Center value for the propulsion system
@@ -44,6 +45,9 @@ const int VISUAL_TEST_TOGGLE_HOLD_TIME = 2500; // Time to hold the visual test b
 const int VISUAL_TEST_TYPE_MIN = 0;
 const int VISUAL_TEST_TYPE_MAX = 3;
 
+// Arm/disarm constants
+const int ARM_DIGITS_TIMEOUT = 1500; // The amount of time between arm digit presses before the system times out and resets the arm code
+
 
 // =============================================================================
 // Global Variables
@@ -60,6 +64,12 @@ uint32_t VisualTestPressedMillis = 0;
 bool VisualTestPressed = false;
 bool VisualTestUpPressed = false;
 bool VisualTestDownPressed = false;
+
+// Arm system menu state
+uint8_t ArmUnlockCode = 0; // Every two bits is one digit of the unlock code
+uint8_t ArmDigitsEntered = 0;
+uint32_t lastArmDigitEnteredMillis = 0;
+bool NextArmDigitPressed = false;
 
 
 // =============================================================================
@@ -642,5 +652,125 @@ void handleArmSystemMenu(SystemStatus_t *systemStatus, JoystickHidData_t *joysti
         return;
     }
 
-    drawCenteredText("Not\nImplemented", CENTER_VERTICALLY);
+    // If the system is armed, draw the arm status and prompt the user to disarm the system
+    if (systemStatus->isFullyArmed || systemStatus->isSoftwareArmed || systemStatus->isPhysicallyArmed)
+    {
+        drawCenteredText("Press 1\nto Disarm", CENTER_VERTICALLY);
+
+        // If the disarm button is pressed, request to disarm the system
+        if (joystickHidData->buttons & DISARM_BUTTON)
+        {
+            systemStatus->requestedArmState = false;
+            systemStatus->softwareArmUpdateRequested = true;
+            ArmUnlockCode = 0;
+        }
+
+        return;
+    }
+    
+    // If the system is not armed and dosn't currently have an unlock code, generate a random unlock code.
+    // The unlock code is stored as an 8 bit integer, with each two bits representing a single digit in the unlock code
+    // The first digit is the first two bits (least significant), the second digit is the next two bits, and so on
+    // Since the joystick has buttons 1-4, we will add one to each digit to get the button number
+    if (ArmUnlockCode == 0)
+    {
+        randomSeed(millis());
+        ArmUnlockCode = random(UINT8_MAX);
+        ArmDigitsEntered = 0;
+    }
+
+    // If a button is pressed, and it is the next digit in the unlock code, increment the digit count.
+    // If the button is not the next digit, reset the digit count
+    if (ArmDigitsEntered < 4)
+    {
+        // Determine the next digit in the unlock code the user needs to enter to arm the system
+        int nextDigit = (ArmUnlockCode >> (2 * ArmDigitsEntered)) & 0b11;
+
+        //
+        // It just so happends that mask value for each of the joystick buttons 1-4 are their face value in binary like this:
+        // 1 = 0b0001
+        // 2 = 0b0010
+        // 3 = 0b0100
+        // 4 = 0b1000
+        // This means that we can use the next digit value directlyed to custruct a buttom mask rather than using a mapping
+        //
+
+        // If correct next digit button is pressed, increment the digit count
+        if (joystickHidData->buttons & (1 << nextDigit))
+        {
+            NextArmDigitPressed = true;
+        }
+        else if (NextArmDigitPressed)
+        {
+            ArmDigitsEntered++;
+            NextArmDigitPressed = false;
+            lastArmDigitEnteredMillis = millis();
+
+            // If the user has entered all four digits, request to arm the system
+            if (ArmDigitsEntered == 4)
+            {
+                systemStatus->requestedArmState = true;
+                systemStatus->softwareArmUpdateRequested = true;
+            }
+        }
+
+        // If an invalid button is pressed, reset the digit count
+        else if (joystickHidData->buttons != 0)
+        {
+            ArmDigitsEntered = 0;
+            NextArmDigitPressed = false;
+        }
+    }
+
+    // If it has been more than ARM_DIGITS_TIMEOUT since the last digit was entered, reset the unlock code
+    if (!NextArmDigitPressed && !(ArmDigitsEntered == 4) && millis() - lastArmDigitEnteredMillis > ARM_DIGITS_TIMEOUT)
+    {
+        ArmDigitsEntered = 0;
+    }
+    
+    // Draw the arm code to the display
+    int armCodeY = ((Display.height() - MENU_HEADER_HEIGHT) / 2) - (MENU_LINE_HEIGHT / 2) + MENU_HEADER_HEIGHT;
+    int armCodeX = 12;
+    for (int currentArmDigitIndex = 0; currentArmDigitIndex < 4; currentArmDigitIndex++)
+    {
+        int rectY = armCodeY - 2;
+        int rectX = (armCodeX + ((6 /* digit */ + 6 /* dash */ + 6 /* dash spacing*/ ) * currentArmDigitIndex)) - 2;
+        int rectWidth = 9;
+        int rectHeight = 11;
+     
+        if (ArmDigitsEntered > currentArmDigitIndex)
+        {
+            Display.fillRect(rectX, rectY, rectWidth, rectHeight, BLACK);
+        }
+        else if (NextArmDigitPressed && ArmDigitsEntered + 1 > currentArmDigitIndex)
+        {
+            Display.drawRect(rectX, rectY, rectWidth, rectHeight, BLACK);
+        }
+    }
+    Display.setCursor(armCodeX, armCodeY);
+    for (int currentArmDigitIndex = 0; currentArmDigitIndex < 4; currentArmDigitIndex++)
+    {
+        // Calculate the current digit in the unlock code
+        int currentArmDigit = (ArmUnlockCode >> (2 * currentArmDigitIndex)) & 0b11;
+
+        // Print the current unlock code digit
+        if (ArmDigitsEntered > currentArmDigitIndex)
+        {
+            Display.setTextColor(WHITE);
+            Display.print(currentArmDigit + 1);
+            Display.setTextColor(BLACK);
+        }
+        else
+        {
+            Display.print(currentArmDigit + 1);
+        }
+
+        // If the current digit isn't the last digit, print a dash after it
+        if (currentArmDigitIndex < 3)
+        {
+            Display.setCursor(Display.getCursorX() + 3, armCodeY);
+            Display.write("-");
+            Display.setCursor(Display.getCursorX() + 3, armCodeY);
+        }
+    }
 }
