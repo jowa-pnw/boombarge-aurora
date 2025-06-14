@@ -4,7 +4,7 @@
 #include "ux.h"
 #include "pb_encode.h"
 #include "pb_decode.h"
-#include "JoystickAggragatorComs.pb.h"
+#include "Joystick.pb.h"
 
 SystemStatus_t SystemStatus;
 
@@ -27,4 +27,3 @@ void loop()
         uxUpdate(&SystemStatus, &JoystickHidData);
     }
 }
- 
