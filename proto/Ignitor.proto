@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+option csharp_namespace = "BoomBarge.Ignitor";
+
+// +
+// + Messages from the aggregator to an ignitor
+// +
+
+// Message from the aggregator to an ignitor
+message IgnitorMessage {
+  oneof message {
+    GetPing get_ping = 1;
+    GetSystemArmed get_system_armed = 2;
+    SetSystemArmed set_system_armed = 3;
+    IgnitionRequest request_ignition = 4;
+  }
+}
+
+// A ping request
+message GetPing {
+  uint32 iteration = 1; // The iteration number of the ping
+}
+
+// A request to get the system armed state
+message GetSystemArmed {
+  // Empty message
+}
+
+// A request to set the system armed state
+message SetSystemArmed {
+  bool armed = 1; // Whether to arm or disarm the system
+}
+
+// A request to ignite the an ematch
+message IgnitionRequest {
+  uint32 ignitor_id = 1; // The index of the ignitor to trigger
+}
+
+
+// +
+// + Messages from the ignitor to the joystick
+// +
+
+// Message from the ignitor to the joystick
+message IgnitorReplyMessage {
+  oneof message {
+    PingReply ping_reply = 1;
+    GetSystemArmedReply get_system_armed_reply = 2;
+    IgnitionConfirmation ignition_confirmation = 3;
+  }
+}
+
+// A ping reply from the ignitor to the joystick
+message PingReply {
+  int32 iteration = 1; // The iteration number of the ping
+}
+
+// A reply to the GetSystemArmed request
+message GetSystemArmedReply {
+  bool armed = 1; // Whether the system is armed or disarmed
+}
+
+// A confirmation that an ignition request was processed
+message IgnitionConfirmation {
+  uint32 ignitor_id = 1; // The index of the ignitor that was triggered
+}
